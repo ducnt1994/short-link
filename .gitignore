@@ -98,4 +98,8 @@ Thumbs.db
 
 # Temporary files
 tmp/
-temp/ 
+temp/
+
+# Local API documentation (not for git)
+api-commands.md
+test-api.sh 

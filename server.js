@@ -13,8 +13,23 @@ const PORT = process.env.PORT || 3000;
 const shortLinkRoutes = require('./routes/shortLink');
 const antiSpamMiddleware = require('./middleware/antiSpam');
 
-// Security middleware
-app.use(helmet());
+// Security middleware with custom CSP for dashboard
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  }
+}));
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   credentials: true
@@ -44,7 +59,7 @@ const speedLimiter = slowDown({
 });
 
 // Apply rate limiting to all routes
-app.use(limiter);
+// app.use(limiter);
 app.use(speedLimiter);
 
 // Anti-spam middleware

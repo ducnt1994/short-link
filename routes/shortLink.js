@@ -257,6 +257,68 @@ router.get('/stats/clicks', (req, res) => {
   });
 });
 
+// Reset database (clear all data)
+router.post('/reset-db', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
+  
+  console.log(`🔄 Reset database requested by IP: ${clientIP}`);
+  
+  // Helper function to run SQL with Promise
+  function runSQL(sql) {
+    return new Promise((resolve, reject) => {
+      db.run(sql, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 
+  // Reset all tables
+  const resetDatabase = async () => {
+    try {
+      console.log('🗑️ Starting database reset...');
+      
+      // Delete all data from tables
+      await runSQL('DELETE FROM shortlinks');
+      console.log('✅ Shortlinks table cleared');
+      
+      await runSQL('DELETE FROM spam_logs');
+      console.log('✅ Spam logs table cleared');
+      
+      await runSQL('DELETE FROM blocked_ips');
+      console.log('✅ Blocked IPs table cleared');
+      
+      await runSQL('DELETE FROM rate_limit_logs');
+      console.log('✅ Rate limit logs table cleared');
+      
+      // Reset auto-increment counters
+      await runSQL('DELETE FROM sqlite_sequence WHERE name IN ("shortlinks", "spam_logs", "blocked_ips", "rate_limit_logs")');
+      console.log('✅ Auto-increment counters reset');
+      
+      console.log('🎉 Database reset completed successfully');
+      
+      res.json({
+        success: true,
+        message: 'Database reset successfully',
+        timestamp: new Date().toISOString(),
+        resetBy: clientIP
+      });
+      
+    } catch (error) {
+      console.error('❌ Error during database reset:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to reset database',
+        details: error.message
+      });
+    }
+  };
+
+  // Execute the reset
+  resetDatabase();
+});
 
 module.exports = router; 

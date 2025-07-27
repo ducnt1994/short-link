@@ -291,7 +291,7 @@
         </div>
 
         <div class="content">
-            <button class="refresh-btn" onclick="loadStats()">🔄 Làm mới dữ liệu</button>
+            <button class="refresh-btn" id="refreshBtn">🔄 Làm mới dữ liệu</button>
             
             <div id="loading" class="loading">
                 <div class="spinner"></div>
@@ -370,17 +370,19 @@
                 </div>
             </div>
 
-            <div class="api-info">
-                <h3>🔌 API Endpoint</h3>
-                <div class="api-endpoint">GET /api/shortlink/stats/overview</div>
-                <p>Dữ liệu được lấy từ API endpoint trên và tự động cập nhật mỗi khi bạn nhấn nút "Làm mới dữ liệu".</p>
-            </div>
+    
         </div>
     </div>
 
     <script>
         // Load stats when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners
+            document.getElementById('refreshBtn').addEventListener('click', loadStats);
+            // testAPI()
+            // document.getElementById('testBtn').addEventListener('click', testAPI);
+            
+            // Load initial stats
             loadStats();
         });
 
@@ -395,15 +397,28 @@
             errorDiv.style.display = 'none';
             statsDiv.style.display = 'none';
 
+            console.log('🔄 Starting to load stats...');
+
             try {
                 // Load basic stats
-                const response = await fetch('/api/shortlink/stats/overview');
+                console.log('📡 Fetching /api/shortlink/stats/overview...');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const response = await fetch('/api/shortlink/stats/overview', {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                console.log('📊 Response status:', response.status);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('📊 Basic stats data:', data);
                 
                 // Update basic stats
                 document.getElementById('totalLinks').textContent = data.totalLinks || 0;
@@ -413,6 +428,7 @@
                 document.getElementById('blockedIPs').textContent = data.blockedIPs || 0;
 
                 // Load detailed click stats
+                console.log('📡 Loading click stats...');
                 await loadClickStats();
 
                 // Update last updated time
@@ -437,13 +453,24 @@
 
         async function loadClickStats() {
             try {
-                const response = await fetch('/api/shortlink/stats/clicks');
+                console.log('📡 Fetching /api/shortlink/stats/clicks...');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const response = await fetch('/api/shortlink/stats/clicks', {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                console.log('📊 Click stats response status:', response.status);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('📊 Click stats data:', data);
                 
                 // Update click summary
                 updateClickSummary(data.summary);
@@ -458,7 +485,11 @@
                 updateAllLinks(data.allLinks);
 
             } catch (error) {
-                console.error('Error loading click stats:', error);
+                console.error('❌ Error loading click stats:', error);
+                // Show error in UI
+                const errorDiv = document.getElementById('error');
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = `<p>❌ Lỗi khi tải thống kê click: ${error.message}</p>`;
             }
         }
 
@@ -575,6 +606,34 @@
             if (diffDays < 7) return `${diffDays} ngày trước`;
             
             return date.toLocaleString('vi-VN');
+        }
+
+        // Test API function
+        async function testAPI() {
+            console.log('🧪 Testing API endpoints...');
+            
+            try {
+                // Test basic stats
+                console.log('🧪 Testing /api/shortlink/stats/overview...');
+                const response1 = await fetch('/api/shortlink/stats/overview');
+                console.log('✅ Basic stats API status:', response1.status);
+                
+                // Test click stats
+                console.log('🧪 Testing /api/shortlink/stats/clicks...');
+                const response2 = await fetch('/api/shortlink/stats/clicks');
+                console.log('✅ Click stats API status:', response2.status);
+                
+                // Test health endpoint
+                console.log('🧪 Testing /health...');
+                const response3 = await fetch('/health');
+                console.log('✅ Health API status:', response3.status);
+                
+                // alert('✅ API test completed! Check console for details.');
+                
+            } catch (error) {
+                console.error('❌ API test failed:', error);
+                alert('❌ API test failed: ' + error.message);
+            }
         }
 
         // Auto refresh every 30 seconds
