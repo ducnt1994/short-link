@@ -3,6 +3,13 @@ const path = require('path');
 
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'shortlinks.db');
 
+// Ensure database directory exists
+const fs = require('fs');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err.message);

@@ -68,6 +68,11 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats-dashboard.html'));
 });
 
+// Alternative route for stats dashboard
+app.get('/stats-dashboard.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'stats-dashboard.html'));
+});
+
 // Routes
 app.use('/api/shortlink', shortLinkRoutes);
 

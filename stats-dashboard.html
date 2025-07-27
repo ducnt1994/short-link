@@ -397,7 +397,7 @@
 
             try {
                 // Load basic stats
-                const response = await fetch('http://localhost:3000/api/shortlink/stats/overview');
+                const response = await fetch('/api/shortlink/stats/overview');
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -437,7 +437,7 @@
 
         async function loadClickStats() {
             try {
-                const response = await fetch('http://localhost:3000/api/shortlink/stats/clicks');
+                const response = await fetch('/api/shortlink/stats/clicks');
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
