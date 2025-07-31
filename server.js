@@ -14,6 +14,13 @@ const PORT = process.env.PORT || 3000;
 // Connect to database
 connectDB();
 
+// Create public directory if it doesn't exist
+const publicDir = path.join(__dirname, 'public');
+if (!fs.existsSync(publicDir)) {
+  console.log('📁 Creating public directory...');
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -35,7 +42,18 @@ app.get('/dashboard', (req, res) => {
   if (!fs.existsSync(dashboardPath)) {
     console.error(`Dashboard file not found at: ${dashboardPath}`);
     console.error(`Current directory: ${__dirname}`);
-    console.error(`Public directory contents:`, fs.readdirSync(path.join(__dirname, 'public')));
+    
+    try {
+      // List contents of public directory if it exists
+      if (fs.existsSync(path.join(__dirname, 'public'))) {
+        console.error(`Public directory contents:`, fs.readdirSync(path.join(__dirname, 'public')));
+      } else {
+        console.error('Public directory does not exist');
+      }
+    } catch (error) {
+      console.error('Error reading public directory:', error.message);
+    }
+    
     return res.status(404).json({ 
       error: 'Dashboard not found',
       message: `File not found at: ${dashboardPath}`
@@ -81,6 +99,7 @@ app.listen(PORT, () => {
   console.log(`📈 Dashboard: http://localhost:${PORT}/dashboard`);
   console.log(`📁 Current directory: ${__dirname}`);
   console.log(`📁 Public directory: ${path.join(__dirname, 'public')}`);
+  console.log(`📁 Public directory exists: ${fs.existsSync(path.join(__dirname, 'public'))}`);
 });
 
 module.exports = app; 
