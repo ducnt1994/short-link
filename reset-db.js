@@ -1,144 +1,125 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'database', 'shortlinks.db');
+// Import MongoDB models
+const ShortLink = require('./database/models/ShortLink');
+const SpamLog = require('./database/models/SpamLog');
+const BlockedIP = require('./database/models/BlockedIP');
+const RateLimitLog = require('./database/models/RateLimitLog');
 
-console.log('🗄️ Resetting database...');
-console.log('Database path:', dbPath);
+console.log('🗑️ MongoDB Database Reset Tool');
+console.log('='.repeat(50));
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('❌ Error opening database:', err.message);
+async function connectMongoDB() {
+  try {
+    const dbURI = process.env.DB_URI || 'mongodb://localhost:27017/shortlink';
+    await mongoose.connect(dbURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('✅ Connected to MongoDB database\n');
+    await resetDatabase();
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
     process.exit(1);
-  } else {
-    console.log('✅ Connected to SQLite database');
-    resetDatabase();
   }
-});
-
-function resetDatabase() {
-  console.log('\n🧹 Starting database reset...');
-
-  // Delete all data from tables
-  const tables = [
-    'shortlinks',
-    'spam_logs', 
-    'blocked_ips',
-    'rate_limit_logs'
-  ];
-
-  let completedTables = 0;
-
-  tables.forEach(table => {
-    db.run(`DELETE FROM ${table}`, (err) => {
-      if (err) {
-        console.error(`❌ Error clearing ${table}:`, err.message);
-      } else {
-        console.log(`✅ Cleared table: ${table}`);
-      }
-      
-      completedTables++;
-      
-      if (completedTables === tables.length) {
-        // Reset auto-increment counters
-        resetAutoIncrement();
-      }
-    });
-  });
 }
 
-function resetAutoIncrement() {
-  console.log('\n🔄 Resetting auto-increment counters...');
-  
-  const tables = [
-    'shortlinks',
-    'spam_logs',
-    'blocked_ips', 
-    'rate_limit_logs'
-  ];
-
-  let completedResets = 0;
-
-  tables.forEach(table => {
-    db.run(`DELETE FROM sqlite_sequence WHERE name = '${table}'`, (err) => {
-      if (err) {
-        console.error(`❌ Error resetting sequence for ${table}:`, err.message);
-      } else {
-        console.log(`✅ Reset auto-increment for: ${table}`);
-      }
-      
-      completedResets++;
-      
-      if (completedResets === tables.length) {
-        verifyReset();
-      }
-    });
-  });
-}
-
-function verifyReset() {
-  console.log('\n🔍 Verifying reset...');
-  
-  const queries = [
-    'SELECT COUNT(*) as count FROM shortlinks',
-    'SELECT COUNT(*) as count FROM spam_logs',
-    'SELECT COUNT(*) as count FROM blocked_ips',
-    'SELECT COUNT(*) as count FROM rate_limit_logs'
-  ];
-
-  let completedQueries = 0;
-  const results = {};
-
-  queries.forEach((query, index) => {
-    const tableName = ['shortlinks', 'spam_logs', 'blocked_ips', 'rate_limit_logs'][index];
+async function resetDatabase() {
+  try {
+    console.log('🔄 Starting database reset...');
     
-    db.get(query, (err, row) => {
-      if (err) {
-        console.error(`❌ Error checking ${tableName}:`, err.message);
-      } else {
-        results[tableName] = row.count;
-        console.log(`📊 ${tableName}: ${row.count} records`);
-      }
-      
-      completedQueries++;
-      
-      if (completedQueries === queries.length) {
-        finishReset(results);
-      }
-    });
-  });
-}
+    // Get current counts
+    const [shortlinksCount, spamLogsCount, blockedIPsCount, rateLimitLogsCount] = await Promise.all([
+      ShortLink.countDocuments(),
+      SpamLog.countDocuments(),
+      BlockedIP.countDocuments(),
+      RateLimitLog.countDocuments()
+    ]);
 
-function finishReset(results) {
-  console.log('\n🎉 Database reset completed!');
-  console.log('\n📊 Final record counts:');
-  console.log('├── shortlinks:', results.shortlinks);
-  console.log('├── spam_logs:', results.spam_logs);
-  console.log('├── blocked_ips:', results.blocked_ips);
-  console.log('└── rate_limit_logs:', results.rate_limit_logs);
-  
-  const totalRecords = Object.values(results).reduce((sum, count) => sum + count, 0);
-  
-  if (totalRecords === 0) {
-    console.log('\n✅ All tables are now empty!');
-    console.log('🚀 Database has been successfully reset to initial state.');
-  } else {
-    console.log('\n⚠️  Some records may still exist. Manual cleanup may be required.');
-  }
-  
-  db.close((err) => {
-    if (err) {
-      console.error('❌ Error closing database:', err.message);
-    } else {
-      console.log('\n🔒 Database connection closed.');
+    console.log('📊 Current database state:');
+    console.log(`   📋 shortlinks:     ${shortlinksCount} records`);
+    console.log(`   🚫 spamLogs:       ${spamLogsCount} records`);
+    console.log(`   🚷 blockedIPs:     ${blockedIPsCount} records`);
+    console.log(`   ⏱️  rateLimitLogs:  ${rateLimitLogsCount} records`);
+    console.log('');
+
+    // Confirm reset
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const answer = await new Promise((resolve) => {
+      rl.question('⚠️  Are you sure you want to delete ALL data? (yes/no): ', resolve);
+    });
+
+    rl.close();
+
+    if (answer.toLowerCase() !== 'yes') {
+      console.log('❌ Reset cancelled');
+      await mongoose.connection.close();
+      process.exit(0);
     }
-    process.exit(0);
-  });
+
+    console.log('🗑️ Proceeding with database reset...');
+
+    // Delete all documents from all collections
+    const [shortlinksResult, spamLogsResult, blockedIPsResult, rateLimitLogsResult] = await Promise.all([
+      ShortLink.deleteMany({}),
+      SpamLog.deleteMany({}),
+      BlockedIP.deleteMany({}),
+      RateLimitLog.deleteMany({})
+    ]);
+
+    console.log('✅ Reset completed successfully!');
+    console.log('📊 Deleted records:');
+    console.log(`   📋 shortlinks:     ${shortlinksResult.deletedCount} records`);
+    console.log(`   🚫 spamLogs:       ${spamLogsResult.deletedCount} records`);
+    console.log(`   🚷 blockedIPs:     ${blockedIPsResult.deletedCount} records`);
+    console.log(`   ⏱️  rateLimitLogs:  ${rateLimitLogsResult.deletedCount} records`);
+    console.log('');
+
+    // Verify reset
+    const [newShortlinksCount, newSpamLogsCount, newBlockedIPsCount, newRateLimitLogsCount] = await Promise.all([
+      ShortLink.countDocuments(),
+      SpamLog.countDocuments(),
+      BlockedIP.countDocuments(),
+      RateLimitLog.countDocuments()
+    ]);
+
+    console.log('📊 New database state:');
+    console.log(`   📋 shortlinks:     ${newShortlinksCount} records`);
+    console.log(`   🚫 spamLogs:       ${newSpamLogsCount} records`);
+    console.log(`   🚷 blockedIPs:     ${newBlockedIPsCount} records`);
+    console.log(`   ⏱️  rateLimitLogs:  ${newRateLimitLogsCount} records`);
+    console.log('');
+
+    console.log('🎉 Database reset completed successfully!');
+    console.log('💡 You can now start fresh with your URL shortener application.');
+
+    await mongoose.connection.close();
+    console.log('🔌 MongoDB connection closed');
+
+  } catch (error) {
+    console.error('❌ Error during database reset:', error);
+    await mongoose.connection.close();
+    process.exit(1);
+  }
 }
 
 // Handle process termination
-process.on('SIGINT', () => {
-  console.log('\n⚠️  Process interrupted. Closing database...');
-  db.close();
+process.on('SIGINT', async () => {
+  console.log('\n⚠️  Process interrupted. Closing MongoDB connection...');
+  try {
+    await mongoose.connection.close();
+    console.log('🔌 MongoDB connection closed');
+  } catch (error) {
+    console.error('❌ Error closing MongoDB connection:', error);
+  }
   process.exit(0);
-}); 
+});
+
+// Start the reset process
+connectMongoDB(); 

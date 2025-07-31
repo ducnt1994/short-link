@@ -1,6 +1,6 @@
 # 🔗 URL Shortener với Anti-Spam Protection
 
-Một ứng dụng Node.js tạo link rút gọn với các kỹ thuật chống spam tiên tiến.
+Một ứng dụng Node.js tạo link rút gọn với các kỹ thuật chống spam tiên tiến, sử dụng MongoDB làm database.
 
 ## ✨ Tính năng
 
@@ -24,6 +24,7 @@ Một ứng dụng Node.js tạo link rút gọn với các kỹ thuật chống
 ### Yêu cầu hệ thống
 - Node.js 16+ 
 - npm hoặc yarn
+- MongoDB 4.4+
 
 ### Bước 1: Clone và cài đặt dependencies
 ```bash
@@ -32,7 +33,10 @@ cd short-link
 npm install
 ```
 
-### Bước 2: Cấu hình môi trường
+### Bước 2: Cấu hình MongoDB
+Đảm bảo MongoDB đang chạy trên máy của bạn hoặc sử dụng MongoDB Atlas.
+
+### Bước 3: Cấu hình môi trường
 ```bash
 cp env.example .env
 ```
@@ -43,8 +47,8 @@ Chỉnh sửa file `.env` theo nhu cầu:
 PORT=3000
 NODE_ENV=development
 
-# Database
-DB_PATH=./database/shortlinks.db
+# Database Configuration
+DB_URI=mongodb://localhost:27017/shortlink
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
@@ -57,12 +61,9 @@ SLOW_DOWN_DELAY_MS=500
 MAX_LINKS_PER_IP_PER_DAY=50
 BLOCKED_DOMAINS=spam.com,malware.com,phishing.com
 SUSPICIOUS_KEYWORDS=spam,malware,virus,hack
-
-# Captcha Configuration
-CAPTCHA_ENABLED=true
 ```
 
-### Bước 3: Khởi chạy ứng dụng
+### Bước 4: Khởi chạy ứng dụng
 ```bash
 # Development mode
 npm run dev
@@ -101,8 +102,6 @@ GET /api/shortlink/info/:shortCode
 GET /api/shortlink/stats/overview
 ```
 
-
-
 ## 🛡️ Cơ chế chống spam
 
 ### 1. Rate Limiting
@@ -123,33 +122,62 @@ GET /api/shortlink/stats/overview
 - Giới hạn 50 link/ngày cho mỗi IP
 - Phát hiện tạo link quá nhanh (>10 link/giờ)
 
-## 📊 Database Schema
+## 📊 Database Schema (MongoDB)
 
-### Bảng `shortlinks`
-- `id`: Primary key
-- `original_url`: URL gốc
-- `short_code`: Mã rút gọn
-- `ip_address`: IP tạo link
-- `user_agent`: User agent
-- `created_at`: Thời gian tạo
-- `clicks`: Số lượt click
-- `last_clicked`: Lần click cuối
-- `is_active`: Trạng thái hoạt động
+### Collection `shortlinks`
+```javascript
+{
+  _id: ObjectId,
+  originalUrl: String,        // URL gốc
+  shortCode: String,          // Mã rút gọn (unique)
+  ipAddress: String,          // IP tạo link
+  userAgent: String,          // User agent
+  clicks: Number,             // Số lượt click (default: 0)
+  lastClicked: Date,          // Lần click cuối
+  isActive: Boolean,          // Trạng thái hoạt động (default: true)
+  createdAt: Date,            // Thời gian tạo
+  updatedAt: Date             // Thời gian cập nhật
+}
+```
 
-### Bảng `spam_logs`
-- `id`: Primary key
-- `ip_address`: IP có hành vi spam
-- `action`: Loại hành vi spam
-- `details`: Chi tiết
-- `created_at`: Thời gian ghi log
+### Collection `spamlogs`
+```javascript
+{
+  _id: ObjectId,
+  ipAddress: String,          // IP có hành vi spam
+  action: String,             // Loại hành vi spam
+  details: String,            // Chi tiết
+  createdAt: Date,            // Thời gian ghi log
+  updatedAt: Date             // Thời gian cập nhật
+}
+```
 
-### Bảng `blocked_ips`
-- `id`: Primary key
-- `ip_address`: IP bị chặn
-- `reason`: Lý do chặn
-- `blocked_at`: Thời gian chặn
-- `expires_at`: Thời gian hết hạn
-- `is_permanent`: Chặn vĩnh viễn
+### Collection `blockedips`
+```javascript
+{
+  _id: ObjectId,
+  ipAddress: String,          // IP bị chặn (unique)
+  reason: String,             // Lý do chặn
+  expiresAt: Date,            // Thời gian hết hạn
+  isPermanent: Boolean,       // Chặn vĩnh viễn (default: false)
+  createdAt: Date,            // Thời gian chặn
+  updatedAt: Date             // Thời gian cập nhật
+}
+```
+
+### Collection `ratelimitlogs`
+```javascript
+{
+  _id: ObjectId,
+  ipAddress: String,          // IP address
+  endpoint: String,           // API endpoint
+  requestCount: Number,       // Số request (default: 1)
+  windowStart: Date,          // Bắt đầu window
+  lastRequest: Date,          // Request cuối cùng
+  createdAt: Date,            // Thời gian tạo
+  updatedAt: Date             // Thời gian cập nhật
+}
+```
 
 ## 🔧 Tùy chỉnh
 
@@ -168,7 +196,12 @@ BLOCKED_DOMAINS=spam.com,malware.com
 SUSPICIOUS_KEYWORDS=spam,malware,virus
 ```
 
-
+### Cấu hình Database
+```env
+DB_URI=mongodb://localhost:27017/shortlink
+# Hoặc sử dụng MongoDB Atlas
+DB_URI=mongodb+srv://username:password@cluster.mongodb.net/shortlink
+```
 
 ## 🚀 Deployment
 

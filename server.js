@@ -9,6 +9,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Initialize database
+const { initDatabase, ShortLink } = require('./database/init');
+
 // Import routes and middleware
 const shortLinkRoutes = require('./routes/shortLink');
 const antiSpamMiddleware = require('./middleware/antiSpam');
@@ -92,44 +95,35 @@ app.get('/stats-dashboard.html', (req, res) => {
 app.use('/api/shortlink', shortLinkRoutes);
 
 // Redirect route (must be after API routes)
-app.get('/:shortCode', (req, res) => {
-  const { shortCode } = req.params;
-  const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
-  const db = require('./database/init');
+app.get('/:shortCode', async (req, res) => {
+  try {
+    const { shortCode } = req.params;
+    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
 
-  // Get short link details
-  db.get(
-    `SELECT * FROM shortlinks WHERE short_code = ? AND is_active = 1`,
-    [shortCode],
-    (err, row) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
+    // Get short link details
+    const shortLink = await ShortLink.findOne({ 
+      shortCode, 
+      isActive: true 
+    });
 
-      if (!row) {
-        return res.status(404).json({ error: 'Short link not found' });
-      }
-
-      // Update click count
-      db.run(
-        `UPDATE shortlinks 
-         SET clicks = clicks + 1, last_clicked = datetime('now')
-         WHERE id = ?`,
-        [row.id],
-        (updateErr) => {
-          if (updateErr) {
-            console.error('Error updating click count:', updateErr);
-          }
-        }
-      );
-
-      // Log the redirect
-      console.log(`Redirect: Link ID ${row.id}, IP: ${clientIP}, User-Agent: ${req.headers['user-agent']}`);
-
-      // Redirect to original URL
-      res.redirect(row.original_url);
+    if (!shortLink) {
+      return res.status(404).json({ error: 'Short link not found' });
     }
-  );
+
+    // Update click count
+    shortLink.clicks += 1;
+    shortLink.lastClicked = new Date();
+    await shortLink.save();
+
+    // Log the redirect
+    console.log(`Redirect: Link ID ${shortLink._id}, IP: ${clientIP}, User-Agent: ${req.headers['user-agent']}`);
+
+    // Redirect to original URL
+    res.redirect(shortLink.originalUrl);
+  } catch (error) {
+    console.error('Error in redirect route:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Error handling middleware
@@ -147,10 +141,23 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔒 Anti-spam protection: Enabled`);
-});
+const startServer = async () => {
+  try {
+    // Initialize database
+    await initDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔒 Anti-spam protection: Enabled`);
+      console.log(`🗄️ Database: MongoDB`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app; 
