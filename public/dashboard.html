@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .filter-section {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .filter-group input, .filter-group select {
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .filter-group input:focus, .filter-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .links-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .links-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .links-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+
+        .links-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .short-url {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .short-url:hover {
+            text-decoration: underline;
+        }
+
+        .original-url {
+            color: #6c757d;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .click-count {
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .date-filter {
+            color: #dc3545;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .links-table {
+                font-size: 0.9rem;
+            }
+            
+            .links-table th,
+            .links-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 URL Shortener Dashboard</h1>
+            <p>Quản lý và theo dõi các short links</p>
+        </div>
+
+        <div class="controls">
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label for="startDate">Từ ngày:</label>
+                    <input type="date" id="startDate" name="startDate">
+                </div>
+                <div class="filter-group">
+                    <label for="endDate">Đến ngày:</label>
+                    <input type="date" id="endDate" name="endDate">
+                </div>
+                <div class="filter-group">
+                    <label for="sortBy">Sắp xếp theo:</label>
+                    <select id="sortBy" name="sortBy">
+                        <option value="clicks">Lượt click</option>
+                        <option value="createdAt">Ngày tạo</option>
+                        <option value="shortCode">Mã rút gọn</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button class="btn" onclick="loadLinks()">🔍 Lọc</button>
+                </div>
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-secondary" onclick="resetFilters()">🔄 Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalLinks">-</div>
+                <div class="stat-label">Tổng số links</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalClicks">-</div>
+                <div class="stat-label">Tổng lượt click</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="filteredClicks">-</div>
+                <div class="stat-label">Lượt click (khoảng thời gian)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgClicks">-</div>
+                <div class="stat-label">Trung bình click/link</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="loading" class="loading" style="display: none;">
+                <h3>🔄 Đang tải dữ liệu...</h3>
+            </div>
+            
+            <div id="error" class="error" style="display: none;"></div>
+            
+            <div id="noData" class="no-data" style="display: none;">
+                <h3>📭 Không có dữ liệu</h3>
+                <p>Không tìm thấy short links nào trong khoảng thời gian đã chọn.</p>
+            </div>
+
+            <table class="links-table" id="linksTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Mã rút gọn</th>
+                        <th>URL gốc</th>
+                        <th>Ngày tạo</th>
+                        <th>Tổng lượt click</th>
+                        <th>Lượt click (khoảng thời gian)</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="linksTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Set default date range (last 30 days)
+        function setDefaultDateRange() {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+            
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        }
+
+        // Load links with filters
+        async function loadLinks() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            if (!startDate || !endDate) {
+                alert('Vui lòng chọn khoảng thời gian!');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                // Get all short links
+                const response = await fetch('/api/shortlink/all');
+                const links = await response.json();
+
+                if (!links.success) {
+                    throw new Error(links.error || 'Lỗi khi tải dữ liệu');
+                }
+
+                // Get click statistics for each link in the date range
+                const linksWithStats = await Promise.all(
+                    links.data.map(async (link) => {
+                        try {
+                            const statsResponse = await fetch(`/api/shortlink/stats/${link.shortCode}?startDate=${startDate}&endDate=${endDate}`);
+                            const stats = await statsResponse.json();
+                            
+                            return {
+                                ...link,
+                                filteredClicks: stats.success ? stats.clicks : 0
+                            };
+                        } catch (error) {
+                            console.error(`Error getting stats for ${link.shortCode}:`, error);
+                            return {
+                                ...link,
+                                filteredClicks: 0
+                            };
+                        }
+                    })
+                );
+
+                // Sort links
+                linksWithStats.sort((a, b) => {
+                    switch (sortBy) {
+                        case 'clicks':
+                            return b.clicks - a.clicks;
+                        case 'createdAt':
+                            return new Date(b.createdAt) - new Date(a.createdAt);
+                        case 'shortCode':
+                            return a.shortCode.localeCompare(b.shortCode);
+                        default:
+                            return 0;
+                    }
+                });
+
+                displayLinks(linksWithStats);
+                updateStats(linksWithStats, startDate, endDate);
+
+            } catch (error) {
+                console.error('Error loading links:', error);
+                showError(error.message);
+            }
+        }
+
+        // Display links in table
+        function displayLinks(links) {
+            const tableBody = document.getElementById('linksTableBody');
+            const table = document.getElementById('linksTable');
+            const noData = document.getElementById('noData');
+
+            if (links.length === 0) {
+                table.style.display = 'none';
+                noData.style.display = 'block';
+                return;
+            }
+
+            table.style.display = 'table';
+            noData.style.display = 'none';
+
+            tableBody.innerHTML = links.map(link => `
+                <tr>
+                    <td>
+                        <a href="/${link.shortCode}" target="_blank" class="short-url">
+                            ${link.shortCode}
+                        </a>
+                    </td>
+                    <td>
+                        <div class="original-url" title="${link.originalUrl}">
+                            ${link.originalUrl}
+                        </div>
+                    </td>
+                    <td>${formatDate(link.createdAt)}</td>
+                    <td class="click-count">${link.clicks}</td>
+                    <td class="date-filter">${link.filteredClicks}</td>
+                    <td>
+                        <button class="btn" onclick="viewDetails('${link.shortCode}')">
+                            📊 Chi tiết
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Update statistics
+        function updateStats(links, startDate, endDate) {
+            const totalLinks = links.length;
+            const totalClicks = links.reduce((sum, link) => sum + link.clicks, 0);
+            const filteredClicks = links.reduce((sum, link) => sum + link.filteredClicks, 0);
+            const avgClicks = totalLinks > 0 ? (totalClicks / totalLinks).toFixed(1) : 0;
+
+            document.getElementById('totalLinks').textContent = totalLinks;
+            document.getElementById('totalClicks').textContent = totalClicks;
+            document.getElementById('filteredClicks').textContent = filteredClicks;
+            document.getElementById('avgClicks').textContent = avgClicks;
+        }
+
+        // View link details
+        function viewDetails(shortCode) {
+            window.open(`/api/shortlink/info/${shortCode}`, '_blank');
+        }
+
+        // Reset filters
+        function resetFilters() {
+            setDefaultDateRange();
+            document.getElementById('sortBy').value = 'clicks';
+            loadLinks();
+        }
+
+        // Show loading state
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('linksTable').style.display = 'none';
+            document.getElementById('noData').style.display = 'none';
+        }
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = `Lỗi: ${message}`;
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            setDefaultDateRange();
+            loadLinks();
+        });
+    </script>
+</body>
+</html> 
