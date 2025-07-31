@@ -284,9 +284,7 @@
         </div>
 
         <div class="content">
-            <div id="loading" class="loading" style="display: none;">
-                <h3>🔄 Đang tải dữ liệu...</h3>
-            </div>
+    
             
             <div id="error" class="error" style="display: none;"></div>
             
@@ -302,8 +300,6 @@
                         <th>URL gốc</th>
                         <th>Ngày tạo</th>
                         <th>Tổng lượt click</th>
-                        <th>Lượt click (khoảng thời gian)</th>
-                        <th>Hành động</th>
                     </tr>
                 </thead>
                 <tbody id="linksTableBody">
@@ -418,12 +414,6 @@
                     </td>
                     <td>${formatDate(link.createdAt)}</td>
                     <td class="click-count">${link.clicks}</td>
-                    <td class="date-filter">${link.filteredClicks}</td>
-                    <td>
-                        <button class="btn" onclick="viewDetails('${link.shortCode}')">
-                            📊 Chi tiết
-                        </button>
-                    </td>
                 </tr>
             `).join('');
         }
@@ -455,10 +445,10 @@
 
         // Show loading state
         function showLoading() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').style.display = 'none';
-            document.getElementById('linksTable').style.display = 'none';
-            document.getElementById('noData').style.display = 'none';
+            // document.getElementById('loading').style.display = 'block';
+            // document.getElementById('error').style.display = 'none';
+            // document.getElementById('linksTable').style.display = 'none';
+            // document.getElementById('noData').style.display = 'none';
         }
 
         // Show error
