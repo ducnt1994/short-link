@@ -14,18 +14,18 @@ const clickHistorySchema = new mongoose.Schema({
     type: Number, // Store as seconds timestamp
     required: true
   },
-  count: {
-    type: Number,
-    default: 1
-  },
   ipAddress: {
     type: String
   },
   userAgent: {
     type: String
+  },
+  timestamp: {
+    type: Number, // Store as seconds timestamp
+    default: () => Math.floor(Date.now() / 1000)
   }
 }, {
-  timestamps: { 
+  timestamps: {
     type: Number, // Store timestamps as seconds
     default: () => Math.floor(Date.now() / 1000)
   },
@@ -33,8 +33,9 @@ const clickHistorySchema = new mongoose.Schema({
 });
 
 // Create indexes
-clickHistorySchema.index({ shortLinkId: 1, date: 1 }, { unique: true });
+clickHistorySchema.index({ shortLinkId: 1, date: 1 });
 clickHistorySchema.index({ shortCode: 1 });
 clickHistorySchema.index({ date: -1 });
+clickHistorySchema.index({ timestamp: -1 });
 
 module.exports = mongoose.model('ClickHistory', clickHistorySchema); 

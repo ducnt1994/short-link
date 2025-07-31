@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const connectDB = require('./config/database');
@@ -28,7 +29,28 @@ app.get('/health', (req, res) => {
 
 // Dashboard route
 app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+  const dashboardPath = path.join(__dirname, 'public', 'dashboard.html');
+  
+  // Check if file exists
+  if (!fs.existsSync(dashboardPath)) {
+    console.error(`Dashboard file not found at: ${dashboardPath}`);
+    console.error(`Current directory: ${__dirname}`);
+    console.error(`Public directory contents:`, fs.readdirSync(path.join(__dirname, 'public')));
+    return res.status(404).json({ 
+      error: 'Dashboard not found',
+      message: `File not found at: ${dashboardPath}`
+    });
+  }
+  
+  res.sendFile(dashboardPath, (err) => {
+    if (err) {
+      console.error('Error sending dashboard file:', err);
+      res.status(500).json({ 
+        error: 'Failed to serve dashboard',
+        message: err.message 
+      });
+    }
+  });
 });
 
 // API routes
@@ -39,7 +61,8 @@ app.get('/:shortCode', redirectToOriginal);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error details:', err);
+  console.error('Error stack:', err.stack);
   res.status(500).json({ 
     error: 'Something went wrong!',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
@@ -56,6 +79,8 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📈 Dashboard: http://localhost:${PORT}/dashboard`);
+  console.log(`📁 Current directory: ${__dirname}`);
+  console.log(`📁 Public directory: ${path.join(__dirname, 'public')}`);
 });
 
 module.exports = app; 

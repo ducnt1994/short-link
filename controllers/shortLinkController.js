@@ -82,31 +82,26 @@ const redirectToOriginal = async (req, res) => {
     shortLink.clicks += 1;
     await shortLink.save();
     
-    // Update click history for today (in seconds)
+    // Create new click history record (in seconds)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todaySeconds = Math.floor(today.getTime() / 1000);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
     
     try {
-      await ClickHistory.findOneAndUpdate(
-        { 
-          shortLinkId: shortLink._id, 
-          date: todaySeconds
-        },
-        { 
-          $inc: { count: 1 },
-          shortCode: shortCode,
-          ipAddress: clientIP,
-          userAgent: userAgent
-        },
-        { 
-          upsert: true, 
-          new: true 
-        }
-      );
+      const clickRecord = new ClickHistory({
+        shortLinkId: shortLink._id,
+        shortCode: shortCode,
+        date: todaySeconds,
+        ipAddress: clientIP,
+        userAgent: userAgent,
+        timestamp: currentTimestamp
+      });
+      
+      await clickRecord.save();
     } catch (historyError) {
-      console.error('Error updating click history:', historyError);
-      // Continue with redirect even if history update fails
+      console.error('Error creating click history record:', historyError);
+      // Continue with redirect even if history creation fails
     }
 
     // Redirect to original URL
@@ -128,10 +123,25 @@ const getShortLinkInfo = async (req, res) => {
       return res.status(404).json({ error: 'Short link not found' });
     }
 
-    // Get click history
-    const clickHistory = await ClickHistory.find({ shortLinkId: shortLink._id })
-      .sort({ date: -1 })
-      .limit(30); // Last 30 days
+    // Get click history - aggregate by date
+    const clickHistory = await ClickHistory.aggregate([
+      { $match: { shortLinkId: shortLink._id } },
+      { 
+        $group: { 
+          _id: '$date', 
+          count: { $sum: 1 },
+          clicks: { 
+            $push: { 
+              timestamp: '$timestamp',
+              ipAddress: '$ipAddress',
+              userAgent: '$userAgent'
+            }
+          }
+        } 
+      },
+      { $sort: { _id: -1 } },
+      { $limit: 30 } // Last 30 days
+    ]);
 
     res.json({
       id: shortLink._id,
@@ -139,8 +149,13 @@ const getShortLinkInfo = async (req, res) => {
       shortCode: shortLink.shortCode,
       clicks: shortLink.clicks,
       clickHistory: clickHistory.map(h => ({
-        date: new Date(h.date * 1000), // Convert seconds back to Date
-        count: h.count
+        date: new Date(h._id * 1000), // Convert seconds back to Date
+        count: h.count,
+        clicks: h.clicks.map(c => ({
+          timestamp: new Date(c.timestamp * 1000),
+          ipAddress: c.ipAddress,
+          userAgent: c.userAgent
+        }))
       })),
       createdAt: new Date(shortLink.createdAt * 1000) // Convert seconds back to Date
     });
@@ -174,7 +189,7 @@ const getDailyStats = async (req, res) => {
         date: { $gte: startSeconds, $lte: endSeconds }
       });
 
-      clicks = history.reduce((sum, h) => sum + h.count, 0);
+      clicks = history.length; // Count individual records
     } else {
       // Get clicks for specific date
       let targetDate;
@@ -188,12 +203,12 @@ const getDailyStats = async (req, res) => {
       
       const targetDateSeconds = Math.floor(targetDate.getTime() / 1000);
 
-      const dayHistory = await ClickHistory.findOne({
+      const dayHistory = await ClickHistory.find({
         shortLinkId: shortLink._id,
         date: targetDateSeconds
       });
 
-      clicks = dayHistory ? dayHistory.count : 0;
+      clicks = dayHistory.length; // Count individual records
     }
 
     res.json({
