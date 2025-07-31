@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const dbURI = process.env.DB_URI || 'mongodb://localhost:27017/shortlink';
+    const dbURI = process.env.DB_URI || 'mongodb://localhost:27017/url_shortener';
     
     await mongoose.connect(dbURI, {
       useNewUrlParser: true,

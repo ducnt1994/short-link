@@ -1,74 +1,24 @@
 const express = require('express');
-const rateLimit = require('express-rate-limit');
-const slowDown = require('express-slow-down');
-const helmet = require('helmet');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+const connectDB = require('./config/database');
+const shortLinkRoutes = require('./routes/shortLinkRoutes');
+const { redirectToOriginal } = require('./controllers/shortLinkController');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize database
-const { initDatabase, ShortLink } = require('./database/init');
+// Connect to database
+connectDB();
 
-// Import routes and middleware
-const shortLinkRoutes = require('./routes/shortLink');
-const antiSpamMiddleware = require('./middleware/antiSpam');
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Security middleware with custom CSP for dashboard
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "https:", "data:"],
-      connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: []
-    }
-  }
-}));
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-  credentials: true
-}));
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Speed limiting
-const speedLimiter = slowDown({
-  windowMs: parseInt(process.env.SLOW_DOWN_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  delayAfter: parseInt(process.env.SLOW_DOWN_DELAY_AFTER) || 50, // allow 50 requests per 15 minutes, then...
-  delayMs: parseInt(process.env.SLOW_DOWN_DELAY_MS) || 500 // begin adding 500ms of delay per request above 50
-});
-
-// Apply rate limiting to all routes
-// app.use(limiter);
-app.use(speedLimiter);
-
-// Anti-spam middleware
-app.use(antiSpamMiddleware);
-
-// Static files
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check
@@ -76,55 +26,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Static info page
-app.get('/info', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static-info.html'));
-});
-
-// Stats dashboard
+// Dashboard route
 app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'stats-dashboard.html'));
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// Alternative route for stats dashboard
-app.get('/stats-dashboard.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'stats-dashboard.html'));
-});
-
-// Routes
+// API routes
 app.use('/api/shortlink', shortLinkRoutes);
 
-// Redirect route (must be after API routes)
-app.get('/:shortCode', async (req, res) => {
-  try {
-    const { shortCode } = req.params;
-    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
-
-    // Get short link details
-    const shortLink = await ShortLink.findOne({ 
-      shortCode, 
-      isActive: true 
-    });
-
-    if (!shortLink) {
-      return res.status(404).json({ error: 'Short link not found' });
-    }
-
-    // Update click count
-    shortLink.clicks += 1;
-    shortLink.lastClicked = new Date();
-    await shortLink.save();
-
-    // Log the redirect
-    console.log(`Redirect: Link ID ${shortLink._id}, IP: ${clientIP}, User-Agent: ${req.headers['user-agent']}`);
-
-    // Redirect to original URL
-    res.redirect(shortLink.originalUrl);
-  } catch (error) {
-    console.error('Error in redirect route:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
+// Redirect route at root level (must be after API routes)
+app.get('/:shortCode', redirectToOriginal);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -141,23 +52,10 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-const startServer = async () => {
-  try {
-    // Initialize database
-    await initDatabase();
-    
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔒 Anti-spam protection: Enabled`);
-      console.log(`🗄️ Database: MongoDB`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📈 Dashboard: http://localhost:${PORT}/dashboard`);
+});
 
 module.exports = app; 

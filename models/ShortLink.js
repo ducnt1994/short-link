@@ -12,30 +12,19 @@ const shortLinkSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
-  ipAddress: {
-    type: String,
-    required: true
-  },
-  userAgent: {
-    type: String
-  },
   clicks: {
     type: Number,
     default: 0
-  },
-  lastClicked: {
-    type: Date
-  },
-  isActive: {
-    type: Boolean,
-    default: true
   }
 }, {
-  timestamps: true
+  timestamps: { 
+    type: Number, // Store timestamps as seconds
+    default: () => Math.floor(Date.now() / 1000)
+  }
 });
 
-// Create indexes (shortCode index is automatically created by unique: true)
-shortLinkSchema.index({ ipAddress: 1 });
+// Create indexes
+shortLinkSchema.index({ originalUrl: 1 });
 shortLinkSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('ShortLink', shortLinkSchema); 
